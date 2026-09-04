@@ -10,28 +10,54 @@ simulación en [MuJoCo](https://mujoco.org), con escenas listas para usar.
 ## Contenido
 
 ```
-models/so101/
-├── so101.xml          # el brazo: árbol cinemático, juntas, actuadores
-├── scene.xml          # escena básica (piso + luz + brazo)
-├── scene_box.xml      # escena con un cubo libre y un keyframe de agarre
-├── scene_ik.xml       # escena con objetivo mocap para IK y cubo agarrable
-├── assets/            # 19 mallas STL (visuales y de colisión)
-├── so101.png          # render de referencia
-├── README.md          # procedencia del modelo y pasos de derivación
-├── CHANGELOG.md
-└── LICENSE            # Apache 2.0
+├── pyproject.toml     # dependencias del proyecto
+├── uv.lock            # versiones exactas (no editar a mano)
+└── models/so101/
+    ├── so101.xml      # el brazo: árbol cinemático, juntas, actuadores
+    ├── scene.xml      # escena básica (piso + luz + brazo)
+    ├── scene_box.xml  # escena con un cubo libre y un keyframe de agarre
+    ├── scene_ik.xml   # escena con objetivo mocap para IK y cubo agarrable
+    ├── assets/        # 19 mallas STL (visuales y de colisión)
+    ├── so101.png      # render de referencia
+    ├── README.md      # procedencia del modelo y pasos de derivación
+    ├── CHANGELOG.md
+    └── LICENSE        # Apache 2.0
 ```
 
-Requiere **MuJoCo 3.1.3 o superior**. Verificado con MuJoCo 3.12.0.
+## Instalación
+
+El repo se gestiona con [`uv`](https://docs.astral.sh/uv/). Las dependencias y
+sus versiones exactas están fijadas en `pyproject.toml` y `uv.lock`, así que la
+instalación es un solo comando y a todos les toca la misma versión de MuJoCo.
+
+```bash
+# 1. instalar uv (una sola vez)
+curl -LsSf https://astral.sh/uv/install.sh | sh     # macOS / Linux
+# Windows (PowerShell):
+#   powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+
+# 2. clonar y sincronizar
+git clone https://github.com/strahlenguy/Sim_Mujoco_SO101.git
+cd Sim_Mujoco_SO101
+uv sync
+```
+
+`uv sync` crea el entorno `.venv/` y resuelve el lock. No hace falta activar
+nada: todo se ejecuta con `uv run`.
+
+Dependencias: `mujoco` (≥3.1.3, verificado con 3.12.0) y `numpy`. Python ≥3.10.
 
 ## Uso rápido
 
 ```bash
-pip install mujoco
-python -m mujoco.viewer --mjcf=models/so101/scene.xml
+uv run mjpython -m mujoco.viewer --mjcf=models/so101/scene.xml   # macOS
+uv run python   -m mujoco.viewer --mjcf=models/so101/scene.xml   # Linux / Windows
 ```
 
-En macOS el visor necesita `mjpython` en lugar de `python`.
+Otras escenas: `--mjcf=models/so101/scene_box.xml` o `scene_ik.xml`.
+
+En la ventana, **Tab** (o el botón `>`) abre el panel lateral; en la pestaña
+**Control** hay un slider por junta.
 
 Desde código:
 
@@ -48,9 +74,35 @@ for _ in range(200):
 print(data.qpos)                # posiciones articulares resultantes
 ```
 
+Guardado como `prueba.py`, se ejecuta con `uv run prueba.py`.
+
 Se carga siempre una **escena**, nunca `so101.xml` directamente: cada escena hace
 `<include file="so101.xml"/>` y le añade piso, luz y objetos. MuJoCo fusiona ambos
 archivos en un solo modelo al compilar.
+
+### macOS: `mjpython` y el parche de `libpython`
+
+En macOS el visor tiene que correr en el hilo principal, así que MuJoCo trae el
+lanzador `mjpython` (sustituto directo de `python`, admite los mismos flags).
+Los scripts sin ventana van con `uv run python` normal.
+
+Con entornos creados por `uv` hay un fallo conocido
+([mujoco#1923](https://github.com/google-deepmind/mujoco/issues/1923)):
+
+```
+failed to dlopen path '.../.venv/bin/python':
+  Library not loaded: @executable_path/../lib/libpython3.12.dylib
+```
+
+El CPython *standalone* de `uv` guarda la `libpython` en su propio directorio,
+pero `mjpython` la busca dentro de `.venv/lib/`. Se arregla con un symlink:
+
+```bash
+PYLIB=$(uv run python -c "import sysconfig, os; print(os.path.join(sysconfig.get_config_var('LIBDIR'), sysconfig.get_config_var('LDLIBRARY')))")
+mkdir -p .venv/lib && ln -sf "$PYLIB" ".venv/lib/$(basename "$PYLIB")"
+```
+
+Hay que rehacerlo si `uv` recrea el `.venv` o cambia de versión de Python.
 
 ## Cómo está construido el modelo
 
