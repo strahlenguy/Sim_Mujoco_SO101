@@ -1,0 +1,13 @@
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+
+# macOS
+.DS_Store
+
+# Salidas de simulación
+*.mp4
+render*.png
