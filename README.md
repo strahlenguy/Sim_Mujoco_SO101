@@ -12,6 +12,7 @@ simulación en [MuJoCo](https://mujoco.org), con escenas listas para usar.
 ```
 ├── pyproject.toml     # dependencias del proyecto
 ├── uv.lock            # versiones exactas (no editar a mano)
+├── ver.py             # visor con sliders por junta
 ├── wasd.py            # control del brazo con el teclado
 └── models/so101/
     ├── so101.xml      # el brazo: árbol cinemático, juntas, actuadores
@@ -51,14 +52,18 @@ Dependencias: `mujoco` (≥3.1.3, verificado con 3.12.0) y `numpy`. Python ≥3.
 ## Uso rápido
 
 ```bash
-uv run mjpython -m mujoco.viewer --mjcf=models/so101/scene.xml   # macOS
-uv run python   -m mujoco.viewer --mjcf=models/so101/scene.xml   # Linux / Windows
+uv run mjpython ver.py      # macOS
+uv run python   ver.py      # Linux / Windows
 ```
 
-Otras escenas: `--mjcf=models/so101/scene_box.xml` o `scene_ik.xml`.
+Otras escenas: `ver.py scene_box` o `ver.py scene_ik`.
 
 En la ventana, **Tab** (o el botón `>`) abre el panel lateral; en la pestaña
-**Control** hay un slider por junta.
+**Control** hay un slider por junta, que manda directo a los actuadores.
+
+> No uses `python -m mujoco.viewer --mjcf=...`: ese es el visor *gestionado* y
+> aborta en macOS con `RuntimeError: Caught an unknown exception!`. `ver.py` usa
+> `launch_passive`, que funciona en los tres sistemas.
 
 Desde código:
 
