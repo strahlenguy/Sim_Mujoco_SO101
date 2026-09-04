@@ -12,6 +12,7 @@ simulación en [MuJoCo](https://mujoco.org), con escenas listas para usar.
 ```
 ├── pyproject.toml     # dependencias del proyecto
 ├── uv.lock            # versiones exactas (no editar a mano)
+├── wasd.py            # control del brazo con el teclado
 └── models/so101/
     ├── so101.xml      # el brazo: árbol cinemático, juntas, actuadores
     ├── scene.xml      # escena básica (piso + luz + brazo)
@@ -80,7 +81,31 @@ Se carga siempre una **escena**, nunca `so101.xml` directamente: cada escena hac
 `<include file="so101.xml"/>` y le añade piso, luz y objetos. MuJoCo fusiona ambos
 archivos en un solo modelo al compilar.
 
+### Control con el teclado (`wasd.py`)
+
+```bash
+uv run mjpython wasd.py     # macOS
+uv run python   wasd.py     # Linux / Windows
+```
+
+Mueves un punto en el espacio y el brazo lo persigue resolviendo cinemática
+inversa. 86 líneas, sin dependencias más allá de las del repo.
+
+| Tecla | Acción | Tecla | Acción |
+|---|---|---|---|
+| `W` / `S` | adelante / atrás | `O` / `C` | abrir / cerrar la pinza |
+| `A` / `D` | izquierda / derecha | `R` | volver a la pose inicial |
+| `Q` / `E` | arriba / abajo | | |
+
+Cada ciclo calcula el jacobiano del TCP y da un paso de mínimos cuadrados
+amortiguados hacia el objetivo. El detalle que importa: la IK se resuelve sobre
+una copia **cinemática** del estado (`mj_kinematics`, sin física), no sobre la
+posición real del brazo. Si se hace sobre la real, el retraso del servo se
+integra en la consigna y el brazo se va de largo.
+
 ### macOS: `mjpython` y el parche de `libpython`
+
+Solo aplica en macOS. En Windows y Linux basta `uv run python`.
 
 En macOS el visor tiene que correr en el hilo principal, así que MuJoCo trae el
 lanzador `mjpython` (sustituto directo de `python`, admite los mismos flags).
@@ -88,21 +113,23 @@ Los scripts sin ventana van con `uv run python` normal.
 
 Con entornos creados por `uv` hay un fallo conocido
 ([mujoco#1923](https://github.com/google-deepmind/mujoco/issues/1923)):
+el CPython *standalone* de `uv` guarda la `libpython` en su propio directorio,
+pero `mjpython` la busca dentro de `.venv/lib/`.
 
 ```
 failed to dlopen path '.../.venv/bin/python':
   Library not loaded: @executable_path/../lib/libpython3.12.dylib
 ```
 
-El CPython *standalone* de `uv` guarda la `libpython` en su propio directorio,
-pero `mjpython` la busca dentro de `.venv/lib/`. Se arregla con un symlink:
+Se arregla con un enlace simbólico, leyendo del propio entorno dónde vive:
 
 ```bash
-PYLIB=$(uv run python -c "import sysconfig, os; print(os.path.join(sysconfig.get_config_var('LIBDIR'), sysconfig.get_config_var('LDLIBRARY')))")
-mkdir -p .venv/lib && ln -sf "$PYLIB" ".venv/lib/$(basename "$PYLIB")"
+VER=$(awk -F' = ' '/^version_info/{print $2}' .venv/pyvenv.cfg | cut -d. -f1,2)
+PYHOME=$(awk -F' = ' '/^home/{print $2}' .venv/pyvenv.cfg)
+mkdir -p .venv/lib && ln -sfn "${PYHOME%/bin}/lib/libpython$VER.dylib" ".venv/lib/libpython$VER.dylib"
 ```
 
-Hay que rehacerlo si `uv` recrea el `.venv` o cambia de versión de Python.
+Hay que rehacerlo cada vez que `uv` recree el `.venv`.
 
 ## Cómo está construido el modelo
 
