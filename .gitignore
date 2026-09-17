@@ -14,3 +14,6 @@ render*.png
 
 # Calibración específica del brazo (generada por tareas/calibrar.py)
 tareas/calibracion.json
+
+# Modelo de MediaPipe (se descarga solo en la 1a ejecucion de vision/mano.py)
+models/mediapipe/
