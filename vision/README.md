@@ -1,121 +1,144 @@
-# vision/ — mover el brazo con la mano vista por la cámara
+# vision/ — mueve el brazo con la mano
 
-Pones la mano delante de la webcam y el brazo la sigue. La palma arrastra el
-punto objetivo del TCP, la IK resuelve las juntas, y el pellizco pulgar-índice
-abre y cierra la pinza. Funciona sobre el simulador y, con `--real`, también
-sobre el SO-101 físico.
+Pones la mano delante de la webcam y el brazo la sigue. La palma lleva la pinza
+por el espacio, y juntar el pulgar con el índice la abre y la cierra.
 
-```
-mano.py     cámara + MediaPipe -> UDP        (python normal)
-brazo.py    UDP -> visor + IK + servos       (mjpython en macOS)
-enlace.py   el protocolo UDP que comparten
-```
+Funciona en Windows, macOS y Linux, con la cámara que ya trae la laptop. Sirve
+igual para el brazo simulado que para el de verdad.
 
-## Por qué son dos procesos
+## Antes de empezar
 
-macOS solo deja abrir ventanas desde el hilo principal, y aquí hay dos que lo
-quieren: el visor de MuJoCo (que además necesita `mjpython` y su bucle de
-Cocoa) y la ventana de vídeo de OpenCV. Separados no se pelean. Hablan por
-datagramas JSON en `127.0.0.1:9101`:
-
-```
-mano.py  ──UDP──>  brazo.py
-```
-
-UDP y no TCP a propósito: si se pierde un paquete da igual, el siguiente llega
-en 30 ms con la posición nueva. Lo que no queremos es que el visor se quede
-esperando a la cámara.
-
-## Uso
+Una sola vez, en la carpeta del repo:
 
 ```bash
-# Terminal 1 — cámara
-uv run python vision/mano.py                 # con ventana de vídeo
-uv run python vision/mano.py --sin-video     # sin ventana
-uv run python vision/mano.py --cam 1         # otra cámara
-
-# Terminal 2 — brazo
-uv run mjpython vision/brazo.py              # solo simulador  (macOS)
-uv run python   vision/brazo.py              # solo simulador  (Linux/Windows)
-uv run mjpython vision/brazo.py --real       # además mueve el brazo físico
+uv sync
 ```
 
-La primera vez, `mano.py` descarga el modelo de manos de MediaPipe
-(`models/mediapipe/hand_landmarker.task`, ~8 MB). macOS pedirá permiso de
-cámara para la terminal: **Ajustes → Privacidad y seguridad → Cámara**.
+Eso instala todo. No hay que activar nada ni descargar nada a mano: la primera
+vez que corras `mano.py` se baja solo el modelo de detección de manos (~8 MB).
 
-## Control
+## Cómo se usa
 
-| Tu mano | Qué mueve |
+Son dos programas y hacen falta **dos terminales**: uno mira por la cámara y el
+otro mueve el brazo.
+
+**Terminal 1 — la cámara:**
+
+```bash
+uv run python vision/mano.py
+```
+
+Se abre una ventana con tu mano y los puntos dibujados encima. Déjala abierta.
+
+**Terminal 2 — el brazo:**
+
+```bash
+uv run python vision/brazo.py
+```
+
+En **macOS** esa segunda línea va con `mjpython` en lugar de `python`:
+
+```bash
+uv run mjpython vision/brazo.py
+```
+
+Se abre el visor con el brazo. Pon la mano delante de la cámara y ya está.
+
+Para cerrar: `q` o `Esc` en la ventana de la cámara, y cierra el visor.
+
+## Cómo se controla
+
+| Tu mano | Qué hace el brazo |
 |---|---|
-| izquierda / derecha | objetivo en **Y** |
-| arriba / abajo | objetivo en **Z** |
-| acercar / alejar de la cámara | objetivo en **X** |
-| pellizco pulgar-índice | abrir / cerrar la pinza |
+| izquierda / derecha | se mueve a los lados |
+| arriba / abajo | sube y baja |
+| acercarte / alejarte de la cámara | se estira y se encoge |
+| juntar pulgar e índice | cierra la pinza |
+| separar pulgar e índice | abre la pinza |
 
-La profundidad (X) sale del **ancho de nudillos**: al acercar la mano a la
-cámara los nudillos se ven más separados. Es profundidad gratis, sin cámara 3D.
+**No hay que pulsar nada para engancharse.** Mientras la cámara te vea la mano,
+el brazo la sigue. **Si sacas la mano del encuadre, el brazo se queda quieto**, y
+cuando la vuelves a meter sigue desde donde se quedó. Sirve para recolocarte:
+igual que levantas el ratón cuando llegas al borde de la mesa.
 
-**Enganche automático.** Mientras la cámara te ve la mano, el objetivo la
-sigue; no hay que pulsar nada. Al aparecer la mano se guarda dónde está ella y
-dónde está el objetivo, y a partir de ahí el objetivo copia tus
-*desplazamientos*, no tu posición absoluta. **Sacas la mano del encuadre y el
-objetivo se congela**; al volver a mostrarla se toma una referencia nueva. Es
-exactamente levantar el ratón para recolocarlo.
-
-Teclas en el visor:
+Teclas, con el visor del brazo seleccionado:
 
 | Tecla | Acción |
 |---|---|
-| `F` o `ESPACIO` | congelar / descongelar el objetivo |
-| `R` | objetivo de vuelta a la pose inicial |
+| `F` o `ESPACIO` | congelar / descongelar (el brazo deja de hacerte caso) |
+| `R` | devolver el brazo al centro |
 
-`brazo.py` imprime una línea de estado:
+La terminal del brazo va escribiendo cómo va:
 
 ```
 [SIGUIENDO ] objetivo=[0.3 0.059 0.24]  pinza=-0.10  errIK=  0.1mm
 ```
 
-Si pone `esperando` es que no llegan paquetes: comprueba que `mano.py` está
-corriendo y con el mismo `--puerto`.
+## Si algo no funciona
+
+| Qué ves | Qué hacer |
+|---|---|
+| `[  esperando]` en la terminal del brazo | La cámara no está mandando nada. Revisa que la Terminal 1 siga corriendo. |
+| No pude abrir la cámara | Si tienes más de una cámara, prueba `uv run python vision/mano.py --cam 1` (y luego `--cam 2`). |
+| Windows: la ventana de la cámara sale negra | Otra aplicación la está usando (Zoom, Teams, Meet). Ciérrala. |
+| Windows: no aparece la ventana | Ajustes → Privacidad → Cámara → deja que las aplicaciones de escritorio accedan. |
+| macOS: no aparece la ventana | Ajustes → Privacidad y seguridad → Cámara → dale permiso a la terminal. |
+| `mano detectada 0.0%` | Falta luz, o la mano sale muy pequeña. Acércate y ponte de frente, con la palma hacia la cámara. |
+| El brazo tiembla | Baja `SUAVIZADO` en `mano.py` (por ejemplo a `0.3`). |
+| Tengo que mover mucho el brazo para mover poco el robot | Sube `ESC_X`, `ESC_Y`, `ESC_Z` en `brazo.py`. |
+| El brazo se queda corto, no llega más lejos | Es la caja de trabajo: `CAJA_LO` y `CAJA_HI` en `brazo.py`. |
 
 ## Ajustes
 
-Todo son constantes arriba de `brazo.py`:
+Están todos juntos arriba de cada archivo, con su comentario:
 
-| Constante | Qué es |
+| Dónde | Qué cambia |
 |---|---|
-| `ESC_X`, `ESC_Y`, `ESC_Z` | metros de objetivo por unidad de mano. Súbelas si tienes que mover mucho el brazo para mover poco el robot |
-| `CAJA_LO`, `CAJA_HI` | caja de trabajo del objetivo. Fuera de ahí la IK se estira y pega tirones |
-| `P_CERRADO`, `P_ABIERTO` | pellizco que cuenta como pinza cerrada / abierta |
-| `SUAVIZADO` (en `mano.py`) | filtro de la detección. 1 = crudo y tiembla, 0.2 = muy suave y va con retraso |
+| `ESC_X`, `ESC_Y`, `ESC_Z` en `brazo.py` | cuánto se mueve el brazo por cada centímetro de mano |
+| `CAJA_LO`, `CAJA_HI` en `brazo.py` | hasta dónde puede llegar el brazo |
+| `P_CERRADO`, `P_ABIERTO` en `brazo.py` | cuánto hay que pellizcar para cerrar la pinza |
+| `SUAVIZADO` en `mano.py` | 1 = responde al instante pero tiembla · 0.2 = muy suave pero con retraso |
 
-## `--real`
+## Con el brazo de verdad
 
-Necesita `tareas/calibracion.json`; si no lo tienes, corre antes una vez
-`uv run python tareas/calibrar.py`.
+Añade `--real`:
 
-Las mismas protecciones que `wasd_real.py`:
+```bash
+uv run python vision/brazo.py --real          # Windows / Linux
+uv run mjpython vision/brazo.py --real        # macOS
+```
 
-- **Arranque sin tirón**: lee la pose real, el simulador *salta* a ella, escribe
-  objetivo = posición actual y solo entonces activa el par.
-- **Topes**: cada junta se recorta a los `min`/`max` que grabaste al calibrar.
-- **Slew**: como mucho `SLEW = 12` pasos de servo por envío, a 50 Hz. Nada de
-  saltos bruscos aunque hagas un gesto rápido.
-- Pide confirmación por terminal antes de energizar.
+Antes hay que calibrar el brazo una vez (`uv run python tareas/calibrar.py`,
+explicado en [`tareas/README.md`](../tareas/README.md)). El puerto se detecta
+solo; si no lo encuentra, pásalo tú:
 
-Al salir el par sigue activo sujetando la pose. Corta la corriente para soltar.
+```bash
+uv run python vision/brazo.py --real --serie COM5            # Windows
+uv run python vision/brazo.py --real --serie /dev/ttyUSB0    # Linux
+```
 
-> El brazo se mueve en cuanto vea tu mano. Zona despejada y el corte de
-> corriente a mano. Si una junta gira al revés, cambia su signo en `SIGNOS`
-> (arriba de `brazo.py`) y vuelve a calibrar.
+> ⚠️ **El brazo se mueve solo en cuanto vea tu mano.** Despeja la mesa y ten a
+> la mano el cable de corriente. Empieza con movimientos lentos y pequeños.
+> El programa pide confirmación antes de encender los motores.
+
+Protecciones que ya lleva, las mismas que `wasd_real.py`:
+
+- Arranca sin tirón: el simulador se coloca en la pose en la que esté el brazo
+  antes de encender los motores.
+- No se pasa de los topes que grabaste al calibrar.
+- Va despacio aunque hagas un gesto brusco (como mucho 12 pasos de servo por
+  envío, 50 veces por segundo).
+
+Al cerrar, los motores se quedan encendidos sujetando la postura. Corta la
+corriente para soltar el brazo.
 
 ## Notas
 
 - Se rastrea **una** mano.
-- MediaPipe está clavado a **0.10.33** en `pyproject.toml`: las 0.10.35 / 1.0.x
-  abortan en Apple Silicon (`DrishtiMetalHelper ... Service is unavailable`) y
-  las ≤0.10.21 exigen `numpy<2`, que choca con mujoco. La 0.10.33 va en CPU y
-  convive con numpy 2.
-- La imagen se voltea en espejo, como un selfie, para que mover la mano a tu
-  derecha mueva el objetivo a tu derecha.
+- La imagen va en espejo, como un selfie: mueves la mano a tu derecha y el
+  brazo va a tu derecha.
+- Los dos programas se pasan la posición de la mano por el puerto 9101 de tu
+  propia computadora. Si ese puerto te da lata, cámbialo en los dos a la vez:
+  `--puerto 9200`.
+- La versión de MediaPipe está fijada a propósito en `pyproject.toml`. No la
+  subas: las nuevas fallan en las Mac con chip M.

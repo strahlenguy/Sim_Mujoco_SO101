@@ -7,4 +7,10 @@ requires-python = ">=3.10"
 dependencies = [
     "mujoco>=3.1.3",
     "numpy>=1.24",
+    "feetech-servo-sdk>=1.0.0",  # driver de los servos STS3215 (wasd_real.py)
+    "pyserial>=3.5",             # puerto USB-serie que usa feetech-servo-sdk
+    # Clavada: las 0.10.35 / 1.0.x abortan en Apple Silicon
+    # ("DrishtiMetalHelper ... Service is unavailable") y las <=0.10.21
+    # exigen numpy<2, que choca con mujoco. Arrastra opencv (vision/).
+    "mediapipe==0.10.33",
 ]

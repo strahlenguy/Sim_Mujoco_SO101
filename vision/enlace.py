@@ -1,12 +1,12 @@
 """Enlace UDP entre la camara (mano.py) y el visor (brazo.py).
 
-Son dos procesos y no dos hilos por una razon concreta de macOS: solo el hilo
-principal puede abrir ventanas, y aqui hay dos que lo quieren. El visor de
-MuJoCo necesita mjpython y su bucle de Cocoa; OpenCV/MediaPipe necesitan el
-suyo. Separados no se pelean, y se hablan por datagramas JSON en localhost.
+Cada uno abre su propia ventana y cada ventana quiere el hilo principal del
+proceso, asi que van en procesos separados y se hablan por datagramas JSON en
+localhost. (En macOS ademas es obligatorio: el visor de MuJoCo solo arranca
+desde el hilo principal, con mjpython.)
 
 UDP y no TCP a proposito: si un paquete se pierde da igual, el siguiente llega
-en 30 ms con la posicion nueva. Lo que no queremos es que el visor se quede
+en 30 ms con la posicion nueva. Lo que no queremos es que el brazo se quede
 esperando a la camara.
 """
 

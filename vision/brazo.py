@@ -28,7 +28,6 @@ minimos cuadrados amortiguados hacia el objetivo.
 """
 
 import argparse
-import glob
 import json
 import math
 import sys
@@ -84,6 +83,20 @@ def pellizco_a_pinza(p: float) -> float:
 
 
 # --- servos -------------------------------------------------------------
+def puertos_probables():
+    """Puertos serie que tienen pinta de ser el brazo, en Windows/macOS/Linux.
+
+    pyserial los lista igual en los tres sistemas: COM3 en Windows,
+    /dev/cu.usbserial-... en macOS, /dev/ttyUSB0 en Linux.
+    """
+    from serial.tools import list_ports
+
+    pistas = ("usbserial", "usbmodem", "wchusb", "ttyUSB", "ttyACM")
+    return sorted(p.device for p in list_ports.comports()
+                  if p.device.upper().startswith("COM")
+                  or any(x in p.device for x in pistas))
+
+
 def conectar_servos(nombre):
     """Abre el puerto, carga la calibracion y deja el brazo BLANDO."""
     from scservo_sdk import (
@@ -95,9 +108,7 @@ def conectar_servos(nombre):
                  "    uv run python tareas/calibrar.py")
     c = json.loads(CALIBRACION.read_text())
 
-    nombre = nombre or next(iter(sorted(
-        glob.glob("/dev/cu.usbserial*") + glob.glob("/dev/cu.usbmodem*")
-        + glob.glob("/dev/ttyUSB*") + glob.glob("/dev/ttyACM*"))), "")
+    nombre = nombre or next(iter(puertos_probables()), "")
     try:
         port = PortHandler(nombre)
         abierto = bool(nombre) and port.openPort() and port.setBaudRate(1_000_000)

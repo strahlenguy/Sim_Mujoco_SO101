@@ -14,6 +14,7 @@ simulación en [MuJoCo](https://mujoco.org), con escenas listas para usar.
 ├── uv.lock            # versiones exactas (no editar a mano)
 ├── ver.py             # visor con sliders por junta
 ├── wasd.py            # control del brazo con el teclado
+├── vision/            # mover el brazo con la mano vista por la cámara
 └── models/so101/
     ├── so101.xml      # el brazo: árbol cinemático, juntas, actuadores
     ├── scene.xml      # escena básica (piso + luz + brazo)
@@ -107,6 +108,25 @@ amortiguados hacia el objetivo. El detalle que importa: la IK se resuelve sobre
 una copia **cinemática** del estado (`mj_kinematics`, sin física), no sobre la
 posición real del brazo. Si se hace sobre la real, el retraso del servo se
 integra en la consigna y el brazo se va de largo.
+
+### Con la mano por la cámara (`vision/`)
+
+Hacen falta dos terminales: una mira por la cámara y la otra mueve el brazo.
+
+```bash
+uv run python vision/mano.py       # terminal 1: la cámara
+uv run python vision/brazo.py      # terminal 2: el brazo  (en macOS, mjpython)
+```
+
+Pones la mano delante de la webcam y el brazo la sigue: la palma arrastra el
+objetivo del TCP (izquierda/derecha → Y, arriba/abajo → Z, acercar/alejar → X,
+por el ancho de nudillos) y el pellizco pulgar-índice abre y cierra la pinza.
+La IK es la misma de `wasd.py`; lo único que cambia es de dónde viene el punto.
+
+Los dos programas se pasan la posición de la mano por UDP en localhost. Con
+`--real`, `brazo.py` mueve además el brazo físico, con las mismas protecciones
+que `wasd_real.py`. Manual de uso, ajustes y qué hacer si algo falla en
+[`vision/README.md`](vision/README.md).
 
 ### macOS: `mjpython` y el parche de `libpython`
 
