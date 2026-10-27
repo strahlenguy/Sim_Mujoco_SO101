@@ -14,6 +14,7 @@ simulación en [MuJoCo](https://mujoco.org), con escenas listas para usar.
 ├── uv.lock            # versiones exactas (no editar a mano)
 ├── ver.py             # visor con sliders por junta
 ├── wasd.py            # control del brazo con el teclado
+├── chat.py            # control del brazo hablándole (LLM local con Ollama)
 ├── vision/            # mover el brazo con la mano vista por la cámara
 └── models/so101/
     ├── so101.xml      # el brazo: árbol cinemático, juntas, actuadores
@@ -127,6 +128,38 @@ Los dos programas se pasan la posición de la mano por UDP en localhost. Con
 `--real`, `brazo.py` mueve además el brazo físico, con las mismas protecciones
 que `wasd_real.py`. Manual de uso, ajustes y qué hacer si algo falla en
 [`vision/README.md`](vision/README.md).
+
+### Hablándole al brazo (`chat.py`)
+
+Un modelo de lenguaje local (vía [Ollama](https://ollama.com)) traduce lo que
+escribes a llamadas de herramientas: `mover_a`, `desplazar`, `pinza`, `casa`,
+`estado`, `recoger_cubo`, `dejar_cubo` y `gesto`. Las coordenadas van en cm y
+cada herramienta mueve el objetivo de la misma IK de `wasd.py`, recortado a una
+caja de trabajo: el modelo no puede mandar el brazo a donde no debe.
+
+```bash
+brew install ollama && brew services start ollama   # una vez (macOS)
+ollama pull qwen3:8b                                 # una vez, ~5 GB
+
+uv run mjpython chat.py      # macOS
+uv run python   chat.py      # Linux / Windows
+```
+
+```
+> hola!                                   -> saluda con la mano
+> sube 5 cm y luego ve 3 a la izquierda
+> recoge el cubo verde y déjalo en x 20, y 8
+> baila un poco
+```
+
+Opciones: `--modelo otro:tag`, `--sin-visor` (solo terminal), `--pensar`
+(activa el razonamiento de qwen3: un poco más listo pero tarda de 15 s a 2 min
+por orden). Para inventar gestos nuevos basta con añadirlos al diccionario
+`GESTOS`: son listas de poses articulares.
+
+Probado con `qwen3:8b` en una M4 de 16 GB: 14 de 16 frases de prueba bien,
+~4–6 s por orden. `qwen3:4b` no sirve: en Ollama es la variante que siempre
+razona, y tarda más de un minuto por orden.
 
 ### macOS: `mjpython` y el parche de `libpython`
 
